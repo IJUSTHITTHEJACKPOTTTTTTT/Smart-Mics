@@ -118,3 +118,5 @@ class SmartMics {
     }
 
     // hat: when said [TEXT] (contains
+
+Scratch.extensions.register(new SmartMics());
