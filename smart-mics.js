@@ -118,5 +118,94 @@ class SmartMics {
     }
 
     // hat: when said [TEXT] (contains
+        // hat: when said [TEXT] (contains)
+    whenSaidText(args) {
+        if (typeof args.TEXT !== "string") args.TEXT = String(args.TEXT);
+        const text = args.TEXT.toLowerCase();
+        return this.lastSaid.includes(text);
+    }
+
+    whenSaidAnyWord(args) {
+        const words = this._parseWords(args.LIST);
+        if (!words.length) return false;
+        for (const w of words) {
+            if (this.lastSaid.includes(w)) return true;
+        }
+        return false;
+    }
+
+    whenSaidAllWords(args) {
+        const words = this._parseWords(args.LIST);
+        if (!words.length) return false;
+        for (const w of words) {
+            if (!this.lastSaid.includes(w)) return false;
+        }
+        return true;
+    }
+
+    whenSaidExact(args) {
+        if (typeof args.TEXT !== "string") args.TEXT = String(args.TEXT);
+        const text = args.TEXT.toLowerCase();
+        return this.lastSaid === text;
+    }
+
+    getInfo() {
+        return {
+            id: "smartmics",
+            name: "Smart Mics",
+            blocks: [
+                { opcode: "startListening", blockType: "command", text: "start listening" },
+                { opcode: "stopListening", blockType: "command", text: "stop listening" },
+                { opcode: "getLastSaid", blockType: "reporter", text: "last said" },
+                {
+                    opcode: "said",
+                    blockType: "Boolean",
+                    text: "said [TEXT] using [MODE]",
+                    arguments: {
+                        TEXT: { type: "string", defaultValue: "hello" },
+                        MODE: { type: "string", menu: "matchMode" }
+                    }
+                },
+                {
+                    opcode: "setCooldown",
+                    blockType: "command",
+                    text: "set speech cooldown to [SECONDS] seconds using [MODE]",
+                    arguments: {
+                        SECONDS: { type: "number", defaultValue: 0.5 },
+                        MODE: { type: "string", menu: "cooldownMode" }
+                    }
+                },
+                {
+                    opcode: "whenSaidText",
+                    blockType: "hat",
+                    text: "when said [TEXT]",
+                    arguments: { TEXT: { type: "string", defaultValue: "hello" } }
+                },
+                {
+                    opcode: "whenSaidAnyWord",
+                    blockType: "hat",
+                    text: "when said any word in [LIST]",
+                    arguments: { LIST: { type: "string", defaultValue: "start, go, hello" } }
+                },
+                {
+                    opcode: "whenSaidAllWords",
+                    blockType: "hat",
+                    text: "when said all words in [LIST]",
+                    arguments: { LIST: { type: "string", defaultValue: "turn on" } }
+                },
+                {
+                    opcode: "whenSaidExact",
+                    blockType: "hat",
+                    text: "when said exact phrase [TEXT]",
+                    arguments: { TEXT: { type: "string", defaultValue: "open door" } }
+                }
+            ],
+            menus: {
+                matchMode: { acceptReporters: true, items: ["contains", "exact"] },
+                cooldownMode: { acceptReporters: true, items: ["global", "per-phrase"] }
+            }
+        };
+    }
+}
 
 Scratch.extensions.register(new SmartMics());
