@@ -4,6 +4,13 @@ class SmartMics {
         this.lastSaid = "";
         this.listening = false;
 
+        // cooldown settings
+        this.cooldownMode = "global"; // "global" or "per-phrase"
+        this.globalCooldownMs = 0;
+        this.perPhraseCooldownMs = 0;
+        this.lastGlobalTrigger = 0;
+        this.lastPhraseTriggers = {};
+
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         this.recognition = new SpeechRecognition();
         this.recognition.continuous = true;
@@ -14,6 +21,36 @@ class SmartMics {
             const result = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
             this.lastSaid = result;
             console.log("Heard:", result);
+
+            const now = Date.now();
+            let allowed = true;
+
+            // global cooldown
+            if (this.cooldownMode === "global" && this.globalCooldownMs > 0) {
+                if (now - this.lastGlobalTrigger < this.globalCooldownMs) {
+                    allowed = false;
+                } else {
+                    this.lastGlobalTrigger = now;
+                }
+            }
+
+            // per-phrase cooldown
+            if (this.cooldownMode === "per-phrase" && this.perPhraseCooldownMs > 0) {
+                const last = this.lastPhraseTriggers[result] || 0;
+                if (now - last < this.perPhraseCooldownMs) {
+                    allowed = false;
+                } else {
+                    this.lastPhraseTriggers[result] = now;
+                }
+            }
+
+            if (!allowed) return;
+
+            // trigger hats
+            this.runtime.startHats("smartmics_whenSaidText");
+            this.runtime.startHats("smartmics_whenSaidAnyWord");
+            this.runtime.startHats("smartmics_whenSaidAllWords");
+            this.runtime.startHats("smartmics_whenSaidExact");
         };
 
         this.recognition.onerror = (e) => {
@@ -39,45 +76,45 @@ class SmartMics {
         return this.lastSaid;
     }
 
-    said(text) {
-        if (!text) return false;
-        return this.lastSaid.includes(text.toLowerCase());
+    said(text, mode) {
+        if (typeof text !== "string") text = String(text);
+        text = text.toLowerCase();
+
+        if (mode === "exact") {
+            return this.lastSaid === text;
+        }
+
+        // default: contains
+        return this.lastSaid.includes(text);
     }
 
-    getInfo() {
-        return {
-            id: "smartmics",
-            name: "Smart Mics",
-            blocks: [
-                {
-                    opcode: "startListening",
-                    blockType: "command",
-                    text: "start listening"
-                },
-                {
-                    opcode: "stopListening",
-                    blockType: "command",
-                    text: "stop listening"
-                },
-                {
-                    opcode: "getLastSaid",
-                    blockType: "reporter",
-                    text: "last said"
-                },
-                {
-                    opcode: "said",
-                    blockType: "Boolean",
-                    text: "said [TEXT]",
-                    arguments: {
-                        TEXT: {
-                            type: "string",
-                            defaultValue: "hello"
-                        }
-                    }
-                }
-            ]
-        };
-    }
-}
+    // cooldown command
+    setCooldown(args) {
+        let seconds = Number(args.SECONDS);
+        if (!isFinite(seconds) || seconds < 0) seconds = 0;
+        const ms = seconds * 1000;
 
-Scratch.extensions.register(new SmartMics());
+        if (args.MODE === "per-phrase") {
+            this.cooldownMode = "per-phrase";
+            this.perPhraseCooldownMs = ms;
+        } else {
+            this.cooldownMode = "global";
+            this.globalCooldownMs = ms;
+        }
+    }
+
+    // helper: parse word list
+    _parseWords(input) {
+        let s = input;
+        if (Array.isArray(s)) {
+            s = s.join(" ");
+        }
+        if (typeof s !== "string") s = String(s);
+        s = s.toLowerCase();
+        return s
+            .split(/[\s,]+/)
+            .map(w => w.trim())
+            .filter(w => w.length > 0);
+    }
+
+    // hat: when said [TEXT] (contains
